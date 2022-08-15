@@ -1,0 +1,69 @@
+body,
+html {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+body {
+  background-image: url(./../assets/swirl_pattern.png);
+  min-height: 100%;
+}
+#player-0 {
+  display: flex;
+  width: 100vw;
+  justify-content: center;
+  position: absolute;
+  top: 80vh;
+  height: 20vh;
+  .card {
+    position: relative;
+    width: calc(100% / 14);
+    > img {
+      height: 100%;
+    }
+    &.selected {
+      transform: translate(0px, -30px);
+      transition: all 0.5s;
+    }
+  }
+}
+
+.player {
+  display: flex;
+  position: absolute;
+  justify-content: center;
+  width: 50vw;
+  .card {
+    width: 10px;
+    > img {
+      width: 9vw;
+      padding-top: 20px;
+      margin-left: -4vw;
+      transform-origin: bottom center;
+    }
+  }
+  @for $i from 0 through 14 {
+    .card:nth-child(#{$i}) > img {
+      transform: rotate(($i - 6) * 5deg);
+    }
+  }
+
+  &#player-1 {
+    top: 0;
+    right: 0;
+    transform: translate(40%, 150%) rotate(-90deg);
+  }
+
+  &#player-2 {
+    top: 0;
+    transform: translate(50%, -10%) rotate(-180deg);
+  }
+
+  &#player-3 {
+    left: 0;
+    top: 0;
+    transform: translate(-40%, 150%) rotate(90deg);
+  }
+}
