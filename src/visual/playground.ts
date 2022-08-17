@@ -1,81 +1,43 @@
-import { CardCombinations, CombinationType } from '../game/card/card-combinations';
-import {Card, CardColor, CardType} from '../game/card/card.model';
-import {Player} from '../player/player.class';
+import {GameLeader} from '../game/game-leader';
+import {VisualPlayerComputer} from './visual-player-computer';
+import {VisualPlayerPerson} from './visual-player-person';
 
 export class Playground {
-  private combinator: CardCombinations = new CardCombinations();
-  
-  constructor(private players: Player[]) {
-    players.forEach((player, playerIndex) => {
-      player.getHandCards().subscribe((cards) => {
-        if (playerIndex === 0) {
-          this.drawPlayerHand0(cards);
-          console.log(this.combinator.getCombinations(cards));
-        } else {
-          this.drawPlayerHand(cards, playerIndex);
-        }
-      });
+  private mainPlayer: VisualPlayerPerson;
+  private computerPlayers: VisualPlayerComputer[] = [];
+  constructor(private gameLeader: GameLeader) {
+    gameLeader.getGameState().subscribe((state) => {
+      document.querySelector('body').setAttribute('class', `state-${state}`);
     });
+    gameLeader.getPlayers().forEach((player, playerIndex) => {
+      if (player.isComputer) {
+        this.computerPlayers.push(
+          new VisualPlayerComputer(player, playerIndex)
+        );
+      } else {
+        this.mainPlayer = new VisualPlayerPerson(player);
+      }
+    });
+    this.connectButtons();
   }
 
-  private drawPlayerHand0(cards: Card[]): void {
-    const playerDiv = document.getElementById('player-0');
-    cards.forEach((card, cardIndex) => {
-      const el = document.createElement('div');
-      el.setAttribute('class', `card card-${cardIndex}`);
-      const image = document.createElement('img');
-      const asset = this.getCardAsset(card);
-      image.setAttribute('src', asset);
-      el.appendChild(image);
-      playerDiv?.appendChild(el);
+  private connectButtons(): void {
+    document
+      .getElementById('call-grand-tichu')
+      .addEventListener('click', () =>
+        this.gameLeader.getPlayers()[0].callGrandTichu()
+      );
+    document
+      .getElementById('get-all-cards')
+      .addEventListener('click', () =>
+        this.gameLeader.getPlayers()[0].getAllCards()
+      );
+    document.getElementById('exchange-cards').addEventListener('click', () => {
+      if (this.mainPlayer.setExchangeCards()) {
+        this.gameLeader.exchangeCards();
+      } else {
+        window.alert('Select 3 cards');
+      }
     });
-  }
-
-  private drawPlayerHand(cards: Card[], playerIndex: number): void {
-    const playerDiv = document.getElementById(`player-${playerIndex}`);
-    cards.forEach((_, cardIndex) => {
-      const el = document.createElement('div');
-      el.setAttribute('class', `card card-${cardIndex}`);
-      const image = document.createElement('img');
-      image.setAttribute('src', 'assets/back.png');
-      el.appendChild(image);
-      playerDiv?.appendChild(el);
-    });
-  }
-
-  private getCardAsset(card: Card): string {
-    let assetName = '';
-    switch (card.type) {
-      case CardType.DOG:
-        assetName = 'dog';
-        break;
-      case CardType.DRAGON:
-        assetName = 'dragon';
-        break;
-      case CardType.MAHJONG:
-        assetName = 'mahjong';
-        break;
-      case CardType.PHOENIX:
-        assetName = 'phoenix';
-        break;
-      case CardType.NORMAL:
-        switch (card.color) {
-          case CardColor.JADE:
-            assetName = 'spade_';
-            break;
-          case CardColor.PAGODA:
-            assetName = 'heart_';
-            break;
-          case CardColor.STAR:
-            assetName = 'diamond_';
-            break;
-          case CardColor.SWORD:
-            assetName = 'club_';
-            break;
-        }
-        assetName += card.index;
-        break;
-    }
-    return `assets/${assetName}.png`;
   }
 }

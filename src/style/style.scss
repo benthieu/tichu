@@ -11,6 +11,7 @@ body {
   min-height: 100%;
 }
 #player-0 {
+  z-index: 1;
   display: flex;
   width: 100vw;
   justify-content: center;
@@ -18,15 +19,45 @@ body {
   top: 80vh;
   height: 20vh;
   .card {
+    cursor: pointer;
     position: relative;
     width: calc(100% / 14);
     > img {
       height: 100%;
     }
+    transition: all 0.5s;
     &.selected {
       transform: translate(0px, -30px);
-      transition: all 0.5s;
     }
+  }
+}
+
+.state,
+.hidden {
+  display: none;
+}
+body.state-1 {
+  .state-1 {
+    display: block;
+  }
+}
+body.state-2 {
+  .state-2 {
+    display: block;
+  }
+}
+
+.buttons {
+  position: absolute;
+  top: 50%; right: 50%;
+  transform: translate(50%,-50%);
+  display: flex;
+  flex-direction: column;
+  button {
+    font-size: 2em;
+    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
   }
 }
 

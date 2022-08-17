@@ -1,4 +1,5 @@
-import {Card, CardType} from './card.model';
+import { Card, CardType } from './card.model';
+import { DeckFactory } from './deck.factory';
 
 export class CardCombinations {
   public getCombinations(cards: Card[], toBeat?: Combination): Combination[] {
@@ -7,6 +8,10 @@ export class CardCombinations {
       ...this.cardPair(cards, toBeat),
       ...this.stairs(cards, toBeat),
       ...this.threeOfAKind(cards, toBeat),
+      ...this.straight(cards, toBeat),
+      ...this.fullHouse(cards, toBeat),
+      ...this.bombOfAKind(cards, toBeat),
+      ...this.bombStraight(cards, toBeat)
     ];
   }
 
@@ -31,11 +36,7 @@ export class CardCombinations {
       });
   }
 
-  public cardPair(
-    cards: Card[],
-    toBeat?: Combination,
-    withPhoenix = true
-  ): Combination[] {
+  public cardPair(cards: Card[], toBeat?: Combination): Combination[] {
     if (toBeat && toBeat.type !== CombinationType.CARD_PAIR) {
       return [];
     }
@@ -49,7 +50,7 @@ export class CardCombinations {
             if (
               (search.index === card.index &&
                 search.type === CardType.NORMAL) ||
-              (search.type === CardType.PHOENIX && withPhoenix)
+              search.type === CardType.PHOENIX
             ) {
               collections.push({
                 type: CombinationType.CARD_PAIR,
@@ -84,7 +85,7 @@ export class CardCombinations {
           type: CombinationType.STAIRS,
           cards: [...pair.cards, ...predecessor.cards],
           start: predecessor.start,
-          length: 2,
+          length: 4,
         });
       });
       // there are multiple pairs predecessing this pair
@@ -98,7 +99,7 @@ export class CardCombinations {
           type: CombinationType.STAIRS,
           cards: [...pair.cards, ...predecessor.cards],
           start: predecessor.start,
-          length: predecessor.length + 1,
+          length: predecessor.length + 2,
         });
       });
     });
@@ -155,7 +156,197 @@ export class CardCombinations {
       }
     }
     if (toBeat) {
-      collections = collections.filter((collection) => collection.start > toBeat.start);
+      collections = collections.filter(
+        (collection) => collection.start > toBeat.start
+      );
+    }
+    return collections;
+  }
+
+  public straight(cards: Card[], toBeat?: Combination): Combination[] {
+    if (toBeat && toBeat.type !== CombinationType.STRAIGHT) {
+      return [];
+    }
+    let collections: Combination[] = [];
+    for (let index = 1; index <= 14; index++) {
+      const cardsWithIndex = cards.filter(
+        (card) => card.index === index || card.type === CardType.PHOENIX
+      );
+      cardsWithIndex.forEach((card) => {
+        if (card.type === CardType.PHOENIX) {
+          card = DeckFactory.getPhoenixCard();
+          card.index = index;
+        }
+        collections
+          .filter(
+            (combination) =>
+              combination.cards.find((card) => card.index === index - 1) &&
+              !combination.cards.find((card) => card.index === index)
+          )
+          .map((collection) => {
+            collections.push({
+              type: CombinationType.STRAIGHT,
+              cards: [...collection.cards, card],
+              start: collection.start,
+              length: collection.length + 1,
+            });
+          });
+      });
+      // phenix should not be at the start
+      cardsWithIndex
+        .filter((card) => card.type !== CardType.PHOENIX)
+        .forEach((card) => {
+          collections.push({
+            type: CombinationType.STRAIGHT,
+            cards: [card],
+            start: index,
+            length: 1,
+          });
+        });
+    }
+    // add phoenix (only when upper limit), at the start
+    const phoenix = cards.find((card) => card.type === CardType.PHOENIX);
+    if (phoenix) {
+      collections
+        .filter((collection) => {
+          return collection.cards[collection.cards.length - 1].index === 14;
+        })
+        .map((collection) => {
+          collections.push({
+            type: CombinationType.STRAIGHT,
+            cards: [phoenix, ...collection.cards],
+            start: collection.start - 1,
+            length: collection.length + 1,
+          });
+        });
+    }
+    collections = collections.filter((collection) => collection.length >= 5);
+    collections = collections.filter((collection) => {
+      return (
+        collection.cards.filter((card) => card.type === CardType.PHOENIX)
+          .length <= 1
+      );
+    });
+    // should not include bomb straights
+    const bombs = this.bombStraight(cards);
+    if (bombs.length) {
+      bombs.forEach((bomb) => {
+        collections = collections.filter(
+          (collection) =>
+            !(collection.length === bomb.length &&
+              collection.cards.every((search) => bomb.cards.includes(search)))
+        );
+      });
+    }
+    if (toBeat) {
+      collections = collections.filter(
+        (collection) =>
+          collection.start > toBeat.start && collection.length === toBeat.length
+      );
+    }
+    return collections;
+  }
+
+  public fullHouse(cards: Card[], toBeat?: Combination): Combination[] {
+    if (toBeat && toBeat.type !== CombinationType.FULL_HOUSE) {
+      return [];
+    }
+    const cardPairList = this.cardPair(cards);
+    const threeOfAKindList = this.threeOfAKind(cards);
+    let collections: Combination[] = [];
+    cardPairList.forEach((cardPair) => {
+      threeOfAKindList
+        .filter((collection) => {
+          return !(
+            collection.cards.includes(cardPair.cards[0]) ||
+            collection.cards.includes(cardPair.cards[1])
+          );
+        })
+        .forEach((threeOfAKind) => {
+          collections.push({
+            type: CombinationType.FULL_HOUSE,
+            cards: [...threeOfAKind.cards, ...cardPair.cards],
+            start: threeOfAKind.start,
+            length: 5,
+          });
+        });
+    });
+    collections = collections.filter((collection) => {
+      return !collections.find((search) => {
+        return (
+          search.start > collection.start &&
+          this.hasSameCards(search, collection)
+        );
+      });
+    });
+    if (toBeat) {
+      collections = collections.filter(
+        (collection) => collection.start > toBeat.start
+      );
+    }
+    return collections;
+  }
+
+  public bombOfAKind(cards: Card[], toBeat?: Combination): Combination[] {
+    if (toBeat && toBeat.type === CombinationType.BOMB_STRAIGHT) {
+      return [];
+    }
+    let collections: Combination[] = [];
+    for (let index = 2; index <= 14; index++) {
+      const cardsWithIndex = cards.filter((card) => card.index === index);
+      if (cardsWithIndex.length === 4) {
+        collections.push({
+          type: CombinationType.BOMB_OF_A_KIND,
+          cards: [...cardsWithIndex],
+          start: index,
+          length: 4,
+        });
+      }
+    }
+    if (toBeat) {
+      collections = collections.filter(
+        (collection) => collection.start > toBeat.start
+      );
+    }
+    return collections;
+  }
+
+  public bombStraight(cards: Card[], toBeat?: Combination): Combination[] {
+    let collections: Combination[] = [];
+    for (let index = 2; index <= 14; index++) {
+      const cardsWithIndex = cards.filter((card) => card.index === index);
+      cardsWithIndex.forEach((card) => {
+        collections
+          .filter((combination) =>
+            combination.cards.find(
+              (search) =>
+                search.index === index - 1 && search.color === card.color
+            )
+          )
+          .map((collection) => {
+            collections.push({
+              type: CombinationType.BOMB_STRAIGHT,
+              cards: [...collection.cards, card],
+              start: collection.start,
+              length: collection.length + 1,
+            });
+          });
+      });
+      cardsWithIndex.forEach((card) => {
+        collections.push({
+          type: CombinationType.BOMB_STRAIGHT,
+          cards: [card],
+          start: index,
+          length: 1,
+        });
+      });
+    }
+    collections = collections.filter((collection) => collection.length >= 5);
+    if (toBeat) {
+      collections = collections.filter(
+        (collection) =>
+          collection.start > toBeat.start && collection.length === toBeat.length
+      );
     }
     return collections;
   }
@@ -207,6 +398,7 @@ export interface Combination {
   cards: Card[];
   start: number;
   length: number;
+  player?: number;
 }
 
 export enum CombinationType {
@@ -218,4 +410,5 @@ export enum CombinationType {
   FULL_HOUSE,
   BOMB_OF_A_KIND,
   BOMB_STRAIGHT,
+  PASS
 }
