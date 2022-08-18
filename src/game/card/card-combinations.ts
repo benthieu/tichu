@@ -1,5 +1,5 @@
-import { Card, CardType } from './card.model';
-import { DeckFactory } from './deck.factory';
+import {Card, CardType} from './card.model';
+import {DeckFactory} from './deck.factory';
 
 export class CardCombinations {
   public getCombinations(cards: Card[], toBeat?: Combination): Combination[] {
@@ -11,7 +11,7 @@ export class CardCombinations {
       ...this.straight(cards, toBeat),
       ...this.fullHouse(cards, toBeat),
       ...this.bombOfAKind(cards, toBeat),
-      ...this.bombStraight(cards, toBeat)
+      ...this.bombStraight(cards, toBeat),
     ];
   }
 
@@ -21,7 +21,10 @@ export class CardCombinations {
     }
     return cards
       .filter((card) => {
-        return card.index > (toBeat?.start || -1);
+        return (
+          card.index > (toBeat?.start || -1) ||
+          (card.type === CardType.PHOENIX && (!toBeat || toBeat?.start < 15))
+        );
       })
       .map((card) => {
         return {
@@ -233,8 +236,10 @@ export class CardCombinations {
       bombs.forEach((bomb) => {
         collections = collections.filter(
           (collection) =>
-            !(collection.length === bomb.length &&
-              collection.cards.every((search) => bomb.cards.includes(search)))
+            !(
+              collection.length === bomb.length &&
+              collection.cards.every((search) => bomb.cards.includes(search))
+            )
         );
       });
     }
@@ -303,7 +308,7 @@ export class CardCombinations {
         });
       }
     }
-    if (toBeat) {
+    if (toBeat && toBeat.type === CombinationType.BOMB_OF_A_KIND) {
       collections = collections.filter(
         (collection) => collection.start > toBeat.start
       );
@@ -342,13 +347,26 @@ export class CardCombinations {
       });
     }
     collections = collections.filter((collection) => collection.length >= 5);
-    if (toBeat) {
+    if (toBeat && toBeat.type === CombinationType.BOMB_STRAIGHT) {
       collections = collections.filter(
         (collection) =>
-          collection.start > toBeat.start && collection.length === toBeat.length
+          collection.start > toBeat.start || collection.length >= toBeat.length
       );
     }
     return collections;
+  }
+
+  public static getCombinationToBeat(
+    combinations: Combination[]
+  ): Combination | undefined {
+    let combinationToBeat: Combination;
+    const combinationsToBeat = combinations.filter(
+      (combination) => combination.type !== CombinationType.PASS
+    );
+    if (combinationsToBeat) {
+      combinationToBeat = combinationsToBeat[combinationsToBeat.length - 1];
+    }
+    return combinationToBeat;
   }
 
   private removeDoubles(doubles: Combination[]): Combination[] {
@@ -410,5 +428,5 @@ export enum CombinationType {
   FULL_HOUSE,
   BOMB_OF_A_KIND,
   BOMB_STRAIGHT,
-  PASS
+  PASS,
 }

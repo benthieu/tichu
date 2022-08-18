@@ -1,13 +1,4 @@
-import {
-  BehaviorSubject,
-  combineLatest,
-  delay,
-  map,
-  Observable,
-  of,
-  Subject,
-  take,
-} from 'rxjs';
+import {BehaviorSubject, Observable, Subject} from 'rxjs';
 import {
   CardCombinations,
   Combination,
@@ -17,23 +8,25 @@ import {Card, CardType} from '../game/card/card.model';
 import {DeckFactory} from '../game/card/deck.factory';
 import {Player} from './player.inteface';
 
-export class PlayerComputer implements Player {
-  team: number;
-  index: number;
-  handCards: Card[] = [];
-  tableCards: Card[] = [];
+export class PlayerPerson implements Player {
+  public team: number;
+  public index: number;
+  public handCards: Card[] = [];
+  public tableCards: Card[] = [];
 
   private handCards$ = new BehaviorSubject<Card[]>([]);
   private tableCards$ = new BehaviorSubject<Card[]>([]);
 
+  private allCardsWanted$ = new BehaviorSubject<boolean>(false);
   private grandTichuCalled$ = new BehaviorSubject<boolean>(false);
   private tichuCalled$ = new BehaviorSubject<boolean>(false);
-  private shouldPlay$ = new Subject<boolean>();
 
+  private cardsToExchange$ = new BehaviorSubject<Card[]>([]);
+
+  private shouldPlay$ = new Subject<boolean>();
   private combinationToPlay$ = new Subject<Combination>();
 
   private gameStack: Observable<Combination[]>;
-
   private cardCombinations = new CardCombinations();
 
   constructor(
@@ -51,12 +44,14 @@ export class PlayerComputer implements Player {
     this.handCards$.next(this.handCards);
     this.tableCards = [];
     this.tableCards$.next(this.tableCards);
+    this.allCardsWanted$.next(false);
     this.grandTichuCalled$.next(false);
     this.tichuCalled$.next(false);
+    this.cardsToExchange$.next([]);
   }
 
   public addHandCards(cards: Card[]): void {
-    this.handCards = DeckFactory.sortHandCards([...this.handCards, ...cards]);
+    this.handCards = DeckFactory.sortHandCards([...cards, ...this.handCards]);
     this.handCards$.next(this.handCards);
   }
 
@@ -85,10 +80,12 @@ export class PlayerComputer implements Player {
   }
 
   public getAllCardsWanted(): Observable<boolean> {
-    return of(true);
+    return this.allCardsWanted$.asObservable();
   }
 
-  public setAllCardsWanted(): void {}
+  public setAllCardsWanted(): void {
+    this.allCardsWanted$.next(true);
+  }
 
   public getGrandTichuCalled(): Observable<boolean> {
     return this.grandTichuCalled$.asObservable();
@@ -96,6 +93,7 @@ export class PlayerComputer implements Player {
 
   public setGrandTichuCalled(): void {
     this.grandTichuCalled$.next(true);
+    this.allCardsWanted$.next(true);
   }
 
   public getTichuCalled(): Observable<boolean> {
@@ -107,14 +105,12 @@ export class PlayerComputer implements Player {
   }
 
   public getCardsToExchange(): Observable<Card[]> {
-    return of([
-      this.handCards[0],
-      this.handCards[1],
-      this.handCards[this.handCards.length - 1],
-    ]);
+    return this.cardsToExchange$.asObservable();
   }
 
-  public setCardsToExchange(cards: Card[]): void {}
+  public setCardsToExchange(cards: Card[]): void {
+    this.cardsToExchange$.next(cards);
+  }
 
   public getShouldPlay(): Observable<boolean> {
     return this.shouldPlay$.asObservable();
@@ -122,37 +118,6 @@ export class PlayerComputer implements Player {
 
   public setShouldPlay(play: boolean): void {
     this.shouldPlay$.next(play);
-    combineLatest({
-      cards: this.getHandCards(),
-      collections: this.gameStack,
-    })
-      .pipe(take(1))
-      .subscribe((val) => {
-        setTimeout(
-          () => this.makeNextMove(val.cards, val.collections),
-          val.cards.length ? 1000 : 0
-        );
-      });
-  }
-
-  private makeNextMove(cards: Card[], currentGameStack: Combination[]): void {
-    const allPossibleCombinations = this.cardCombinations.getCombinations(
-      cards,
-      CardCombinations.getCombinationToBeat(currentGameStack)
-    );
-    if (allPossibleCombinations.length) {
-      const longestPlayPossible = allPossibleCombinations
-        .map((a) => a.length)
-        .indexOf(Math.max(...allPossibleCombinations.map((a) => a.length)));
-      this.setCombinationToPlay(allPossibleCombinations[longestPlayPossible]);
-    } else {
-      this.setCombinationToPlay({
-        type: CombinationType.PASS,
-        cards: [],
-        start: 0,
-        length: 0,
-      });
-    }
   }
 
   public getCombinationToPlay(): Observable<Combination> {
@@ -160,7 +125,6 @@ export class PlayerComputer implements Player {
   }
 
   public setCombinationToPlay(combination: Combination): void {
-    console.log(`${this.index}: setCombinationToPlay:`, combination);
     return this.combinationToPlay$.next(combination);
   }
 

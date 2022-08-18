@@ -75,4 +75,16 @@ export class DeckFactory {
       points: -25,
     };
   }
+
+  public static sortHandCards(cards: Card[]): Card[] {
+    return cards.sort((cardA, cardB) => {
+      if (cardA.type === CardType.PHOENIX) {
+        return 1;
+      }
+      if (cardB.type === CardType.PHOENIX) {
+        return -1;
+      }
+      return cardA.index - cardB.index;
+    });
+  }
 }

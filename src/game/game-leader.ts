@@ -2,36 +2,38 @@ import {
   BehaviorSubject,
   combineLatest,
   filter,
-  map,
   merge,
   Observable,
   take,
-  takeUntil,
 } from 'rxjs';
 import {PlayerComputer} from '../player/player-computer.class';
-import {Player} from '../player/player.class';
+import {PlayerPerson} from '../player/player-person.class';
+import {Player} from '../player/player.inteface';
 import {Combination, CombinationType} from './card/card-combinations';
 import {Card, CardType} from './card/card.model';
 import {DeckFactory} from './card/deck.factory';
+import {GameState} from './game-state.model';
 
 export class GameLeader {
   private deckFactory = new DeckFactory();
   private deck: Card[] = [];
-  private currentStack = new BehaviorSubject<Combination[]>([]);
+  private currentStack$ = new BehaviorSubject<Combination[]>([]);
+  public currentStack: Combination[] = [];
   private players = [
-    new Player(0, this.getCurrentStack()),
-    new PlayerComputer(1, this.getCurrentStack()),
-    new PlayerComputer(0, this.getCurrentStack()),
-    new PlayerComputer(1, this.getCurrentStack()),
+    new PlayerPerson(0, 0, this.getCurrentStack()),
+    new PlayerComputer(1, 1, this.getCurrentStack()),
+    new PlayerComputer(0, 2, this.getCurrentStack()),
+    new PlayerComputer(1, 3, this.getCurrentStack()),
   ];
-  private currentlyPlaying = new BehaviorSubject<number | null>(null);
+  private currentPlayer$ = new BehaviorSubject<number | null>(null);
   private gameState = new BehaviorSubject<GameState>(GameState.GAME_STARTED);
 
   constructor() {
     this.startGame();
-    this.currentlyPlaying
+    this.currentPlayer$
       .pipe(filter((playerIndex) => playerIndex != null))
       .subscribe((playerIndex) => {
+        console.log('setting', playerIndex);
         this.players[playerIndex].setShouldPlay(true);
       });
   }
@@ -45,7 +47,11 @@ export class GameLeader {
   }
 
   public getCurrentStack(): Observable<Combination[]> {
-    return this.currentStack.asObservable();
+    return this.currentStack$.asObservable();
+  }
+
+  public getCurrentPlayer(): Observable<number | null> {
+    return this.currentPlayer$.asObservable();
   }
 
   private startGame(): void {
@@ -68,10 +74,10 @@ export class GameLeader {
   }
 
   private waitForPlayersToRequestCards(): void {
-    combineLatest(this.players.map((player) => player.wantsAllCards()))
+    combineLatest(this.players.map((player) => player.getAllCardsWanted()))
       .pipe(
         filter((values) => {
-          return values.every((val) => val);
+          return values.every((val) => !!val);
         }),
         take(1)
       )
@@ -90,41 +96,44 @@ export class GameLeader {
         )
       );
     });
+    this.waitForCardExchange();
   }
 
-  public exchangeCards(): void {
+  public waitForCardExchange(): void {
     this.gameState.next(GameState.WAITING_FOR_EXCHANGE);
-    combineLatest(this.players.map((player) => player.getExchangeCards()))
+    combineLatest(this.players.map((player) => player.getCardsToExchange()))
       .pipe(
         filter((values) => {
           return values.every((val) => val.length === 3);
         }),
         take(1)
       )
-      .subscribe((playerCards) => {
-        playerCards.forEach((exchangeCards, index) => {
-          const thisPlayer = this.players[index];
-          const teammate = this.players.find(
-            (player, searchIndex) =>
-              player.team === this.players[index].team && searchIndex !== index
-          );
-          const enemy = this.players.filter(
-            (player) => player.team !== this.players[index].team
-          );
-          teammate.addHandCards([exchangeCards[2]]);
-          enemy[0].addHandCards([exchangeCards[0]]);
-          enemy[1].addHandCards([exchangeCards[1]]);
-          thisPlayer.removeHandCards(exchangeCards);
-        });
-        this.gameState.next(GameState.CARDS_EXCHANGED);
-        this.startRound();
-      });
+      .subscribe((playerCards) => this.exchangeCards(playerCards));
+  }
+
+  private exchangeCards(cards: Card[][]): void {
+    cards.forEach((exchangeCards, index) => {
+      const thisPlayer = this.players[index];
+      const teammate = this.players.find(
+        (player, searchIndex) =>
+          player.team === this.players[index].team && searchIndex !== index
+      );
+      const enemy = this.players.filter(
+        (player) => player.team !== this.players[index].team
+      );
+      teammate.addHandCards([exchangeCards[2]]);
+      enemy[0].addHandCards([exchangeCards[0]]);
+      enemy[1].addHandCards([exchangeCards[1]]);
+      thisPlayer.removeHandCards(exchangeCards);
+    });
+    this.gameState.next(GameState.CARDS_EXCHANGED);
+    this.startRound();
   }
 
   private startRound(): void {
-    this.setStartingPlayer();
     this.gameState.next(GameState.ROUND_STARTED);
     this.subscribeToPlayerCombinations();
+    this.setStartingPlayer();
   }
 
   private subscribeToPlayerCombinations(): void {
@@ -135,59 +144,83 @@ export class GameLeader {
 
   private handleNewCombination(combination: Combination): void {
     if (combination.cards.length) {
-      this.players[this.currentlyPlaying.value].removeHandCards(
+      this.players[this.currentPlayer$.value].removeHandCards(
         combination.cards
       );
     }
-    combination.player = this.currentlyPlaying.value;
-    this.currentStack.next([...this.currentStack.value, combination]);
-    const newPlayingIndex =
-      this.currentlyPlaying.value + 1 >= this.players.length
-        ? 0
-        : this.currentlyPlaying.value + 1;
-    const activePlayers = this.currentStack.value
+    if (!!combination.cards.find((search) => search.type === CardType.DOG)) {
+      this.handleDogPlay();
+      return;
+    }
+    combination.player = this.currentPlayer$.value;
+    this.addCombinationToStack(combination);
+
+    const newPlayerIndex = this.getNextPlayer();
+    const playerToBeat = this.getPlayerToBeat();
+    console.log('playerToBeat', playerToBeat);
+    if (playerToBeat === newPlayerIndex) {
+      this.clearTableAndStack(newPlayerIndex);
+    }
+    console.log('this.currentPlayer$', newPlayerIndex);
+    this.currentPlayer$.next(newPlayerIndex);
+  }
+
+  private addCombinationToStack(combination: Combination): void {
+    this.currentStack = [...this.currentStack, combination];
+    this.currentStack$.next(this.currentStack);
+  }
+
+  private clearTableAndStack(assignToPlayerIndex: number): void {
+    this.players[assignToPlayerIndex].addTableCards([
+      ...this.currentStack.map((combination) => combination.cards).flat(),
+    ]);
+    this.currentStack = [];
+    this.currentStack$.next(this.currentStack);
+  }
+
+  private getNextPlayer(): number {
+    return this.currentPlayer$.value + 1 >= this.players.length
+      ? 0
+      : this.currentPlayer$.value + 1;
+  }
+
+  private getPlayerToBeat(): number | undefined {
+    let playerToBeat;
+    const playersToBeat = this.currentStack
       .filter((combination) => combination.type !== CombinationType.PASS)
       .map((combination) => combination.player);
-    if (activePlayers[activePlayers.length - 1] === newPlayingIndex) {
-      this.players[newPlayingIndex].addTableCards([
-        ...this.currentStack.value
-          .map((combination) => combination.cards)
-          .flat(),
-      ]);
-      this.currentStack.next([]);
+    if (playersToBeat.length) {
+      playerToBeat = playersToBeat[playersToBeat.length - 1];
     }
-    this.currentlyPlaying.next(newPlayingIndex);
+    return playerToBeat;
+  }
+
+  private handleDogPlay(): void {
+    let newPlayerIndex: number;
+    switch (this.currentPlayer$.value) {
+      case 0:
+        newPlayerIndex = 2;
+        break;
+      case 1:
+        newPlayerIndex = 3;
+        break;
+      case 2:
+        newPlayerIndex = 0;
+        break;
+      case 3:
+        newPlayerIndex = 1;
+        break;
+    }
+    this.currentPlayer$.next(newPlayerIndex);
+    this.currentStack = [];
+    this.currentStack$.next(this.currentStack);
   }
 
   private setStartingPlayer(): void {
-    const handCardsWithPlayerIndex = this.players.map((player, playerIndex) =>
-      player.getHandCards().pipe(
-        take(1),
-        map((cards) => {
-          return {cards: cards, playerIndex: playerIndex};
-        })
-      )
-    );
-    merge(...handCardsWithPlayerIndex)
-      .pipe(
-        filter(
-          (cardAndPlayer) =>
-            !!cardAndPlayer.cards.find((card) => card.type === CardType.MAHJONG)
-        )
-      )
-      .subscribe((cardAndPlayer) => {
-        this.currentlyPlaying.next(cardAndPlayer.playerIndex);
-      });
+    const firstPlayer = this.players.findIndex((player) => {
+      console.log(player.handCards);
+      return !!player.handCards.find((card) => card.type === CardType.MAHJONG);
+    });
+    this.currentPlayer$.next(firstPlayer);
   }
-}
-
-export enum GameState {
-  GAME_STARTED,
-  FIRST_CARDS_HANDED_OUT,
-  ALL_CARDS_HANDED_OUT,
-  WAITING_FOR_EXCHANGE,
-  CARDS_EXCHANGED,
-  ROUND_STARTED,
-  ROUND_ENDED,
-  GAME_ENDED,
 }
