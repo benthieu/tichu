@@ -1,41 +1,7 @@
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-body,
-html {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-body {
-  background-image: url(./../assets/swirl_pattern.png);
-  min-height: 100%;
-}
-#player-0 {
-  z-index: 1;
-  display: flex;
-  width: 100vw;
-  justify-content: center;
-  position: absolute;
-  top: 80vh;
-  height: 20vh;
-  .card {
-    cursor: pointer;
-    position: relative;
-    width: calc(100% / 14);
-    > img {
-      height: 100%;
-    }
-    transition: all 0.5s;
-    &.selected {
-      transform: translate(0px, -30px);
-    }
-  }
-}
+@import 'page';
+@import 'loader';
+@import 'players';
+@import 'stacks';
 
 .state,
 .hidden {
@@ -49,24 +15,6 @@ body {
   }
 }
 
-#current-stack {
-  display: flex;
-  width: 50vw;
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: translate(50%, 40%);
-  height: 100%;
-  justify-content: center;
-  > .card img {
-    height: 15vh;
-  }
-}
-
-.state-5 .buttons {
-  top: 68%;
-}
-
 .buttons {
   position: absolute;
   top: 50%;
@@ -75,80 +23,9 @@ body {
   display: flex;
   flex-direction: column;
   button {
-    font-size: 2em;
+    font-size: 2vh;
     margin-bottom: 1rem;
     padding: 0.5rem 1rem;
     cursor: pointer;
-  }
-}
-
-.player {
-  display: flex;
-  position: absolute;
-  justify-content: center;
-  width: 50vw;
-  .card {
-    width: 10px;
-    > img {
-      width: 9vw;
-      padding-top: 20px;
-      margin-left: -4vw;
-      transform-origin: bottom center;
-    }
-  }
-  @for $i from 0 through 14 {
-    .card:nth-child(#{$i}) > img {
-      transform: rotate(($i - 6) * 5deg);
-    }
-  }
-  &#player-1 {
-    top: 0;
-    right: 0;
-    transform: translate(40%, 150%) rotate(-90deg);
-  }
-  &#player-2 {
-    top: 0;
-    transform: translate(50%, -10%) rotate(-180deg);
-  }
-  &#player-3 {
-    left: 0;
-    top: 0;
-    transform: translate(-40%, 150%) rotate(90deg);
-  }
-}
-
-.loading {
-  position: absolute;
-  background: rgba(10, 10, 10, 0.5);
-  width: 300px;
-  height: 300px;
-  z-index: 1;
-  border-radius: 50%;
-  > div {
-    display: inline-block;
-    width: 90px;
-    height: 90px;
-    display: block;
-    margin: 0 auto;
-    margin-top: 110px;
-    &:after {
-      content: ' ';
-      display: block;
-      width: 64px;
-      height: 64px;
-      margin: 8px;
-      border-radius: 50%;
-      border: 6px solid #fff;
-      border-color: #fff transparent #fff transparent;
-      animation: lds-dual-ring 1.2s linear infinite;
-    }
-  }
-}
-@keyframes lds-dual-ring {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
   }
 }

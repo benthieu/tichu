@@ -22,28 +22,6 @@ export class Playground {
       document.querySelector('body').setAttribute('class', `state-${state}`);
     });
 
-    const currentStackElement = document.querySelector('#current-stack');
-    gameLeader.getCurrentStack().subscribe((stack) => {
-      currentStackElement.innerHTML = '';
-      if (stack.length > 0) {
-        const validCombinations = stack.filter(
-          (combination) => combination.length > 0
-        );
-        const currentCombination =
-          validCombinations[validCombinations.length - 1];
-        const cards = currentCombination.cards;
-        cards.forEach((card) => {
-          const el = document.createElement('div');
-          el.setAttribute('class', `card`);
-          const image = document.createElement('img');
-          const asset = Assets.getCardAsset(card);
-          image.setAttribute('src', asset);
-          el.appendChild(image);
-          currentStackElement.appendChild(el);
-        });
-      }
-    });
-
     const players = gameLeader.getPlayers();
     this.mainPlayer = players[0];
     this.mainPlayerVisual = new VisualPlayerPerson(players[0]);
@@ -51,6 +29,35 @@ export class Playground {
     this.visualPlayers[1] = new VisualPlayerComputer(players[2]);
     this.visualPlayers[2] = new VisualPlayerComputer(players[3]);
     this.connectButtons();
+
+    gameLeader.getCurrentStack().subscribe((stack) => {
+      document.querySelectorAll('.stack').forEach((stack) => {
+        stack.innerHTML = '';
+      });
+      if (stack.length > 0) {
+        const validCombinations = stack.filter(
+          (combination) => combination.length > 0
+        );
+        validCombinations.forEach((combination) => {
+          const currentStackElement = document.querySelector(
+            `#stack-${combination.player}`
+          );
+          const currentPlayElement = document.createElement('div');
+          currentPlayElement.classList.add('play');
+          const cards = combination.cards;
+          cards.forEach((card) => {
+            const el = document.createElement('div');
+            el.setAttribute('class', `card`);
+            const image = document.createElement('img');
+            const asset = Assets.getCardAsset(card);
+            image.setAttribute('src', asset);
+            el.appendChild(image);
+            currentPlayElement.appendChild(el);
+          });
+          currentStackElement.appendChild(currentPlayElement);
+        });
+      }
+    });
   }
 
   private connectButtons(): void {
@@ -106,7 +113,7 @@ export class Playground {
           (search) =>
             !!play.cards.find((card) => {
               return (
-                card.index === search.index || card.type === CardType.PHOENIX
+                card.index === search.index || search.type === CardType.PHOENIX
               );
             })
         )

@@ -2,9 +2,11 @@ import {
   BehaviorSubject,
   combineLatest,
   filter,
+  map,
   merge,
   Observable,
   take,
+  takeUntil,
 } from 'rxjs';
 import {PlayerComputer} from '../player/player-computer.class';
 import {PlayerPerson} from '../player/player-person.class';
@@ -137,9 +139,15 @@ export class GameLeader {
   }
 
   private subscribeToPlayerCombinations(): void {
-    merge(
-      ...this.players.map((player) => player.getCombinationToPlay())
-    ).subscribe((combination) => this.handleNewCombination(combination));
+    merge(...this.players.map((player) => player.getCombinationToPlay()))
+      .pipe(
+        takeUntil(
+          this.getGameState().pipe(
+            filter((state) => state !== GameState.ROUND_STARTED)
+          )
+        )
+      )
+      .subscribe((combination) => this.handleNewCombination(combination));
   }
 
   private handleNewCombination(combination: Combination): void {
@@ -155,13 +163,19 @@ export class GameLeader {
     combination.player = this.currentPlayer$.value;
     this.addCombinationToStack(combination);
 
-    const newPlayerIndex = this.getNextPlayer();
+    if (this.checkForGameEnded()) {
+      this.gameState.next(GameState.ROUND_ENDED);
+      return;
+    }
+
+    let newPlayerIndex = this.getNextPlayer();
     const playerToBeat = this.getPlayerToBeat();
-    console.log('playerToBeat', playerToBeat);
     if (playerToBeat === newPlayerIndex) {
       this.clearTableAndStack(newPlayerIndex);
     }
-    console.log('this.currentPlayer$', newPlayerIndex);
+    if (newPlayerIndex === 0 && this.players[0].handCards.length === 0) {
+      newPlayerIndex = 1;
+    }
     this.currentPlayer$.next(newPlayerIndex);
   }
 
@@ -182,6 +196,14 @@ export class GameLeader {
     return this.currentPlayer$.value + 1 >= this.players.length
       ? 0
       : this.currentPlayer$.value + 1;
+  }
+
+  private checkForGameEnded(): boolean {
+    return (
+      this.players
+        .map((player) => player.handCards.length)
+        .filter((length) => length > 0).length === 1
+    );
   }
 
   private getPlayerToBeat(): number | undefined {

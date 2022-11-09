@@ -1,0 +1,94 @@
+#player-0 {
+  grid-row: 5;
+  grid-column: 1 / span 5;
+  .card {
+    width: 7.15%;
+    cursor: pointer;
+    transition: all 0.5s;
+    transform: translate(0, 0);
+    &.selected {
+      transform: translate(0px, -30px);
+    }
+  }
+}
+
+.card > img {
+  display: block;
+  max-height: 20vh;
+}
+
+#player-1 {
+  grid-column: 5;
+  grid-row: 2 / span 3;
+  .card > img {
+    transform: translate(40%, -130%) rotate(90deg);
+    transform-origin: bottom left;
+  }
+  @for $i from 0 through 14 {
+    .card:nth-child(#{$i}) {
+      transform: rotate(($i - 6) * -5deg);
+      transform-origin: bottom right;
+    }
+  }
+}
+
+#player-2 {
+  grid-column: 2 / span 3;
+  grid-row: 1;
+  @for $i from 0 through 14 {
+    .card:nth-child(#{$i}) {
+      transform: rotate(($i - 6) * -5deg);
+      transform-origin: top left;
+    }
+  }
+  .card img {
+    transform: translate(-40%, -20%);
+  }
+}
+
+#player-3 {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+  @for $i from 0 through 14 {
+    .card:nth-child(#{$i}) {
+      transform: rotate(($i - 6) * 5deg);
+      transform-origin: bottom left;
+    }
+  }
+  .card > img {
+    transform: translate(-40%, -130%) rotate(90deg);
+    transform-origin: bottom left;
+  }
+}
+
+#player-0,
+#player-2 {
+  display: flex;
+  justify-content: center;
+  flex-direction: row;
+}
+
+#player-2 {
+  .card {
+    width: 7px;
+  }
+}
+
+#player-1,
+#player-3 {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  .card {
+    height: 7px;
+  }
+}
+
+@media (max-aspect-ratio: 1/1) {
+  #player-0 .card > img {
+    max-height: 30vw;
+  }
+  .card > img {
+    max-height: 20vw;
+  }
+}
